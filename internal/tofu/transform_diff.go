@@ -6,6 +6,7 @@
 package tofu
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -48,7 +49,7 @@ func (t *DiffTransformer) hasConfigConditions(addr addrs.AbsResourceInstance) bo
 	return len(res.Preconditions) > 0 || len(res.Postconditions) > 0
 }
 
-func (t *DiffTransformer) Transform(g *Graph) error {
+func (t *DiffTransformer) Transform(_ context.Context, g *Graph) error {
 	if t.Changes == nil || len(t.Changes.Resources) == 0 {
 		// Nothing to do!
 		return nil
@@ -115,7 +116,7 @@ func (t *DiffTransformer) Transform(g *Graph) error {
 		// A deposed instance may only have a change of Delete, Forget or NoOp.
 		// A NoOp can happen if the provider shows it no longer exists during
 		// the most recent ReadResource operation.
-		if dk != states.NotDeposed && !(rc.Action == plans.Delete || rc.Action == plans.NoOp || rc.Action == plans.Forget) {
+		if dk != states.NotDeposed && rc.Action != plans.Delete && rc.Action != plans.NoOp && rc.Action != plans.Forget {
 			diags = diags.Append(tfdiags.Sourceless(
 				tfdiags.Error,
 				"Invalid planned change for deposed object",

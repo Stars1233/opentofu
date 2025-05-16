@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-plugin"
-	"github.com/hashicorp/terraform-svchost/disco"
 	"github.com/mattn/go-shellwords"
 	"github.com/mitchellh/cli"
 	"github.com/mitchellh/colorstring"
@@ -27,7 +26,6 @@ import (
 	"github.com/opentofu/opentofu/internal/command/cliconfig"
 	"github.com/opentofu/opentofu/internal/command/format"
 	"github.com/opentofu/opentofu/internal/didyoumean"
-	"github.com/opentofu/opentofu/internal/httpclient"
 	"github.com/opentofu/opentofu/internal/logging"
 	"github.com/opentofu/opentofu/internal/terminal"
 	"github.com/opentofu/opentofu/internal/tracing"
@@ -70,7 +68,7 @@ func main() {
 func realMain() int {
 	defer logging.PanicHandler()
 
-	err := tracing.OpenTelemetryInit()
+	ctx, err := tracing.OpenTelemetryInit(context.Background())
 	if err != nil {
 		// openTelemetryInit can only fail if OpenTofu was run with an
 		// explicit environment variable to enable telemetry collection,
@@ -81,7 +79,6 @@ func realMain() int {
 		return 1
 	}
 	defer tracing.ForceFlush(5 * time.Second)
-	ctx := context.Background()
 
 	// At minimum, we emit a span covering the entire command execution.
 	ctx, span := tracing.Tracer().Start(ctx, "tofu")
@@ -162,27 +159,19 @@ func realMain() int {
 	}
 
 	// Get any configured credentials from the config and initialize
-	// a service discovery object. The slightly awkward predeclaration of
-	// disco is required to allow us to pass untyped nil as the creds source
-	// when creating the source fails. Otherwise we pass a typed nil which
-	// breaks the nil checks in the disco object
-	var services *disco.Disco
+	// a service discovery object.
 	credsSrc, err := credentialsSource(config)
-	if err == nil {
-		services = disco.NewWithCredentialsSource(credsSrc)
-	} else {
+	if err != nil {
 		// Most commands don't actually need credentials, and most situations
 		// that would get us here would already have been reported by the config
 		// loading above, so we'll just log this one as an aid to debugging
 		// in the unlikely event that it _does_ arise.
 		log.Printf("[WARN] Cannot initialize remote host credentials manager: %s", err)
-		// passing (untyped) nil as the creds source is okay because the disco
-		// object checks that and just acts as though no credentials are present.
-		services = disco.NewWithCredentialsSource(nil)
+		credsSrc = nil // must be an untyped nil for newServiceDiscovery to understand "no credentials available"
 	}
-	services.SetUserAgent(httpclient.OpenTofuUserAgent(version.String()))
+	services := newServiceDiscovery(ctx, credsSrc)
 
-	modulePkgFetcher := remoteModulePackageFetcher(config.OCICredentialsPolicy)
+	modulePkgFetcher := remoteModulePackageFetcher(ctx, config.OCICredentialsPolicy)
 
 	providerSrc, diags := providerSource(config.ProviderInstallation, services, config.OCICredentialsPolicy)
 	if len(diags) > 0 {

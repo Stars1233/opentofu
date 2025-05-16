@@ -6,6 +6,7 @@
 package tf
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"testing"
@@ -396,21 +397,21 @@ func (b backendFailsConfigure) PrepareConfig(given cty.Value) (cty.Value, tfdiag
 	return given, nil
 }
 
-func (b backendFailsConfigure) Configure(config cty.Value) tfdiags.Diagnostics {
+func (b backendFailsConfigure) Configure(ctx context.Context, config cty.Value) tfdiags.Diagnostics {
 	log.Printf("[TRACE] backendFailsConfigure.Configure(%#v)", config)
 	var diags tfdiags.Diagnostics
 	diags = diags.Append(fmt.Errorf("Configure should never be called"))
 	return diags
 }
 
-func (b backendFailsConfigure) StateMgr(workspace string) (statemgr.Full, error) {
+func (b backendFailsConfigure) StateMgr(_ context.Context, workspace string) (statemgr.Full, error) {
 	return nil, fmt.Errorf("StateMgr not implemented")
 }
 
-func (b backendFailsConfigure) DeleteWorkspace(name string, _ bool) error {
+func (b backendFailsConfigure) DeleteWorkspace(_ context.Context, name string, _ bool) error {
 	return fmt.Errorf("DeleteWorkspace not implemented")
 }
 
-func (b backendFailsConfigure) Workspaces() ([]string, error) {
+func (b backendFailsConfigure) Workspaces(context.Context) ([]string, error) {
 	return nil, fmt.Errorf("Workspaces not implemented")
 }

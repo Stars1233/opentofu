@@ -195,7 +195,7 @@ func (c *InitCommand) Run(args []string) int {
 	}
 
 	// Load just the root module to begin backend and module initialization
-	rootModEarly, earlyConfDiags := c.loadSingleModuleWithTests(path, testsDirectory)
+	rootModEarly, earlyConfDiags := c.loadSingleModuleWithTests(ctx, path, testsDirectory)
 
 	// There may be parsing errors in config loading but these will be shown later _after_
 	// checking for core version requirement errors. Not meeting the version requirement should
@@ -251,12 +251,12 @@ func (c *InitCommand) Run(args []string) int {
 	// of provider dependencies.
 	if back != nil {
 		c.ignoreRemoteVersionConflict(back)
-		workspace, err := c.Workspace()
+		workspace, err := c.Workspace(ctx)
 		if err != nil {
 			c.Ui.Error(fmt.Sprintf("Error selecting workspace: %s", err))
 			return 1
 		}
-		sMgr, err := back.StateMgr(workspace)
+		sMgr, err := back.StateMgr(ctx, workspace)
 		if err != nil {
 			c.Ui.Error(fmt.Sprintf("Error loading state: %s", err))
 			return 1
@@ -284,7 +284,7 @@ func (c *InitCommand) Run(args []string) int {
 
 	// With all of the modules (hopefully) installed, we can now try to load the
 	// whole configuration tree.
-	config, confDiags := c.loadConfigWithTests(path, testsDirectory)
+	config, confDiags := c.loadConfigWithTests(ctx, path, testsDirectory)
 	// configDiags will be handled after the version constraint check, since an
 	// incorrect version of tofu may be producing errors for configuration
 	// constructs added in later versions.
@@ -407,7 +407,7 @@ func (c *InitCommand) getModules(ctx context.Context, path, testsDir string, ear
 		return false, false, nil
 	}
 
-	ctx, span := tracing.Tracer().Start(ctx, "Get modules", trace.WithAttributes(
+	ctx, span := tracing.Tracer().Start(ctx, "Get Modules", trace.WithAttributes(
 		otelAttr.Bool("opentofu.modules.upgrade", upgrade),
 	))
 	defer span.End()
@@ -469,7 +469,7 @@ func (c *InitCommand) initCloud(ctx context.Context, root *configs.Module, extra
 		Init:   true,
 	}
 
-	back, backDiags := c.Backend(opts, enc.State())
+	back, backDiags := c.Backend(ctx, opts, enc.State())
 	diags = diags.Append(backDiags)
 	return back, true, diags
 }
@@ -552,7 +552,7 @@ the backend configuration is present and valid.
 		Init:           true,
 	}
 
-	back, backDiags := c.Backend(opts, enc.State())
+	back, backDiags := c.Backend(ctx, opts, enc.State())
 	diags = diags.Append(backDiags)
 	return back, true, diags
 }
@@ -656,8 +656,12 @@ func (c *InitCommand) getProviders(ctx context.Context, config *configs.Config, 
 				"\n[reset][bold]Initializing provider plugins...",
 			))
 		},
-		ProviderAlreadyInstalled: func(provider addrs.Provider, selectedVersion getproviders.Version) {
-			c.Ui.Info(fmt.Sprintf("- Using previously-installed %s v%s", provider.ForDisplay(), selectedVersion))
+		ProviderAlreadyInstalled: func(provider addrs.Provider, selectedVersion getproviders.Version, inProviderCache bool) {
+			if inProviderCache {
+				c.Ui.Info(fmt.Sprintf("- Detected previously-installed %s v%s in the shared cache directory", provider.ForDisplay(), selectedVersion))
+			} else {
+				c.Ui.Info(fmt.Sprintf("- Using previously-installed %s v%s", provider.ForDisplay(), selectedVersion))
+			}
 		},
 		BuiltInProviderAvailable: func(provider addrs.Provider) {
 			c.Ui.Info(fmt.Sprintf("- %s is built in to OpenTofu", provider.ForDisplay()))
@@ -683,8 +687,12 @@ func (c *InitCommand) getProviders(ctx context.Context, config *configs.Config, 
 		LinkFromCacheBegin: func(provider addrs.Provider, version getproviders.Version, cacheRoot string) {
 			c.Ui.Info(fmt.Sprintf("- Using %s v%s from the shared cache directory", provider.ForDisplay(), version))
 		},
-		FetchPackageBegin: func(provider addrs.Provider, version getproviders.Version, location getproviders.PackageLocation) {
-			c.Ui.Info(fmt.Sprintf("- Installing %s v%s...", provider.ForDisplay(), version))
+		FetchPackageBegin: func(provider addrs.Provider, version getproviders.Version, location getproviders.PackageLocation, inProviderCache bool) {
+			if inProviderCache {
+				c.Ui.Info(fmt.Sprintf("- Installing %s v%s to the shared cache directory...", provider.ForDisplay(), version))
+			} else {
+				c.Ui.Info(fmt.Sprintf("- Installing %s v%s...", provider.ForDisplay(), version))
+			}
 		},
 		QueryPackagesFailure: func(provider addrs.Provider, err error) {
 			switch errorTy := err.(type) {

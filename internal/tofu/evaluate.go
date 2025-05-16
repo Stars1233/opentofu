@@ -6,6 +6,7 @@
 package tofu
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -354,7 +355,6 @@ func (d *evaluationStateData) GetLocalValue(addr addrs.LocalValue, rng tfdiags.S
 
 func (d *evaluationStateData) GetModule(addr addrs.ModuleCall, rng tfdiags.SourceRange) (cty.Value, tfdiags.Diagnostics) {
 	var diags tfdiags.Diagnostics
-
 	// Output results live in the module that declares them, which is one of
 	// the child module instances of our current module path.
 	moduleAddr := d.ModulePath.Module().Child(addr.Name)
@@ -393,7 +393,7 @@ func (d *evaluationStateData) GetModule(addr addrs.ModuleCall, rng tfdiags.Sourc
 		}
 
 		if output.Deprecated != "" {
-			val = marks.DeprecatedOutput(val, output.Addr, output.Deprecated)
+			val = marks.DeprecatedOutput(val, output.Addr, output.Deprecated, parentCfg.IsModuleCallFromRemoteModule(addr.Name))
 		}
 
 		_, callInstance := output.Addr.Module.CallInstance()
@@ -478,7 +478,7 @@ func (d *evaluationStateData) GetModule(addr addrs.ModuleCall, rng tfdiags.Sourc
 			}
 
 			if cfg.Deprecated != "" {
-				instance[cfg.Name] = marks.DeprecatedOutput(change.After, change.Addr, cfg.Deprecated)
+				instance[cfg.Name] = marks.DeprecatedOutput(change.After, change.Addr, cfg.Deprecated, parentCfg.IsModuleCallFromRemoteModule(addr.Name))
 			}
 		}
 	}
@@ -914,7 +914,8 @@ func (d *evaluationStateData) GetResource(addr addrs.Resource, rng tfdiags.Sourc
 }
 
 func (d *evaluationStateData) getResourceSchema(addr addrs.Resource, providerAddr addrs.Provider) *configschema.Block {
-	schema, _, err := d.Evaluator.Plugins.ResourceTypeSchema(providerAddr, addr.Mode, addr.Type)
+	// TODO: Plumb a useful context.Context through to here.
+	schema, _, err := d.Evaluator.Plugins.ResourceTypeSchema(context.TODO(), providerAddr, addr.Mode, addr.Type)
 	if err != nil {
 		// We have plenty of other codepaths that will detect and report
 		// schema lookup errors before we'd reach this point, so we'll just
@@ -1005,7 +1006,12 @@ func (d *evaluationStateData) GetOutput(addr addrs.OutputValue, rng tfdiags.Sour
 		}
 
 		if config.Deprecated != "" {
-			val = marks.DeprecatedOutput(val, output.Addr, config.Deprecated)
+			isRemote := false
+			if p := moduleConfig.Path; p != nil && !p.IsRoot() {
+				_, call := p.Call()
+				isRemote = moduleConfig.IsModuleCallFromRemoteModule(call.Name)
+			}
+			val = marks.DeprecatedOutput(val, output.Addr, config.Deprecated, isRemote)
 		}
 
 		return val, diags

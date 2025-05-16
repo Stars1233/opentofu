@@ -28,6 +28,36 @@ import (
 	"github.com/opentofu/opentofu/internal/tfdiags"
 )
 
+// traceNamePlanResourceInstance is a standardize trace span name we use for the
+// overall execution of all graph nodes that somehow represent the planning
+// phase for a resource instance.
+const traceNamePlanResourceInstance = "Plan resource instance changes"
+
+// traceNameApplyResourceInstance is a standardize trace span name we use for
+// the overall execution of all graph nodes that somehow represent the apply
+// phase for a resource instance.
+const traceNameApplyResourceInstance = "Apply resource instance changes"
+
+// traceAttrResourceInstanceAddr is a standardized trace span attribute
+// name that we use for recording the address of the main resource instance that
+// a particular span is concerned with.
+//
+// The value of this should be populated by calling the String method on
+// a value of type [addrs.AbsResourceInstance].
+const traceAttrResourceInstanceAddr = "opentofu.resource_instance.address"
+
+// traceAttrPlanRefresh is a standardized trace span attribute name that we use
+// for a boolean attribute describing whether the refresh step is enabled
+// for the main resource instance associated with the span during the planning
+// phase.
+const traceAttrPlanRefresh = "opentofu.plan.refresh"
+
+// traceAttrPlanPlanChanges is a standardized trace span attribute name that we
+// use for a boolean attribute describing whether the plan step is enabled
+// for the main resource instance associated with the span during the planning
+// phase. (This is false in refresh-only mode.)
+const traceAttrPlanPlanChanges = "opentofu.plan.plan_changes"
+
 // NodeAbstractResourceInstance represents a resource instance with no
 // associated operations. It embeds NodeAbstractResource but additionally
 // contains an instance key, used to identify one of potentially many
@@ -2323,7 +2353,8 @@ func (n *NodeAbstractResourceInstance) applyProvisioners(ctx EvalContext, state 
 
 		// The output function
 		outputFn := func(msg string) {
-			ctx.Hook(func(h Hook) (HookAction, error) {
+			// Given that we return nil below, this will never error
+			_ = ctx.Hook(func(h Hook) (HookAction, error) {
 				h.ProvisionOutput(n.Addr, prov.Type, msg)
 				return HookActionContinue, nil
 			})
@@ -2342,7 +2373,8 @@ func (n *NodeAbstractResourceInstance) applyProvisioners(ctx EvalContext, state 
 		// provisioners ought not to be logging anyway.
 		if _, hasSensitive := configMarks[marks.Sensitive]; hasSensitive {
 			outputFn = func(msg string) {
-				ctx.Hook(func(h Hook) (HookAction, error) {
+				// Given that we return nil below, this will never error
+				_ = ctx.Hook(func(h Hook) (HookAction, error) {
 					h.ProvisionOutput(n.Addr, prov.Type, "(output suppressed due to sensitive value in config)")
 					return HookActionContinue, nil
 				})
@@ -2470,7 +2502,8 @@ func (n *NodeAbstractResourceInstance) apply(
 		// such a rare error, we can just drop the raw GoString values in here
 		// to make sure we have something to debug with.
 		var unknownPaths []string
-		cty.Transform(configVal, func(p cty.Path, v cty.Value) (cty.Value, error) {
+		// We don't care about the error return here as it's only to help build a more detailed error message
+		_, _ = cty.Transform(configVal, func(p cty.Path, v cty.Value) (cty.Value, error) {
 			if !v.IsKnown() {
 				unknownPaths = append(unknownPaths, fmt.Sprintf("%#v", p))
 			}
@@ -2611,7 +2644,8 @@ func (n *NodeAbstractResourceInstance) apply(
 		// To generate better error messages, we'll go for a walk through the
 		// value and make a separate diagnostic for each unknown value we
 		// find.
-		cty.Walk(newVal, func(path cty.Path, val cty.Value) (bool, error) {
+		// We don't care about the error return here as it's only to help build a more detailed error message
+		_ = cty.Walk(newVal, func(path cty.Path, val cty.Value) (bool, error) {
 			if !val.IsKnown() {
 				pathStr := tfdiags.FormatCtyPath(path)
 				diags = diags.Append(tfdiags.Sourceless(
