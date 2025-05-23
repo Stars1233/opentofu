@@ -18,8 +18,9 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
-	"github.com/opentofu/opentofu/internal/tfdiags"
 	"github.com/zclconf/go-cty/cty"
+
+	"github.com/opentofu/opentofu/internal/tfdiags"
 
 	version "github.com/hashicorp/go-version"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
@@ -37,7 +38,7 @@ func TestConfigProviderTypes(t *testing.T) {
 		t.Fatal("expected empty result from empty config")
 	}
 
-	cfg, diags := testModuleConfigFromFile("testdata/valid-files/providers-explicit-implied.tf")
+	cfg, diags := testModuleConfigFromFile(t.Context(), "testdata/valid-files/providers-explicit-implied.tf")
 	if diags.HasErrors() {
 		t.Fatal(diags.Error())
 	}
@@ -82,7 +83,7 @@ func TestConfigProviderTypes_nested(t *testing.T) {
 }
 
 func TestConfigResolveAbsProviderAddr(t *testing.T) {
-	cfg, diags := testModuleConfigFromDir("testdata/providers-explicit-fqn")
+	cfg, diags := testModuleConfigFromDir(t.Context(), "testdata/providers-explicit-fqn")
 	if diags.HasErrors() {
 		t.Fatal(diags.Error())
 	}
@@ -296,6 +297,39 @@ func TestConfigProviderRequirementsDuplicate(t *testing.T) {
 	_, diags := testNestedModuleConfigFromDir(t, "testdata/duplicate-local-name")
 	assertDiagnosticCount(t, diags, 3)
 	assertDiagnosticSummary(t, diags, "Duplicate required provider")
+}
+
+func TestConfigProviderForEach(t *testing.T) {
+	_, diags := testNestedModuleConfigFromDir(t, "testdata/provider_for_each")
+	assertDiagnosticCount(t, diags, 4)
+
+	want := hcl.Diagnostics{
+		{
+			Summary: "Provider configuration for_each matches module",
+			Detail:  "This provider configuration uses the same for_each expression as a module, which means that subsequent removal of elements from this collection would cause a planning error.",
+		}, {
+			Summary: "Provider configuration for_each matches resource",
+			Detail:  "This provider configuration uses the same for_each expression as a resource, which means that subsequent removal of elements from this collection would cause a planning error.",
+		}, {
+			Summary: "Invalid module provider configuration",
+			Detail:  `This module doesn't declare a provider "dumme" block with alias = "key", which is required for use with for_each`,
+		}, {
+			Summary: "Invalid resource provider configuration",
+			Detail:  `This module doesn't declare a provider "dumme" block with alias = "key", which is required for use with for_each`,
+		},
+	}
+
+	for _, wd := range want {
+		found := false
+		for _, gd := range diags {
+			if gd.Summary == wd.Summary && strings.HasPrefix(gd.Detail, wd.Detail) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("Expected Diagnostic %s", wd)
+		}
+	}
 }
 
 func TestConfigProviderRequirementsShallow(t *testing.T) {
@@ -640,7 +674,7 @@ func TestVerifyDependencySelections(t *testing.T) {
 }
 
 func TestConfigProviderForConfigAddr(t *testing.T) {
-	cfg, diags := testModuleConfigFromDir("testdata/valid-modules/providers-fqns")
+	cfg, diags := testModuleConfigFromDir(t.Context(), "testdata/valid-modules/providers-fqns")
 	assertNoDiagnostics(t, diags)
 
 	got := cfg.ProviderForConfigAddr(addrs.NewDefaultLocalProviderConfig("foo-test"))
@@ -658,7 +692,7 @@ func TestConfigProviderForConfigAddr(t *testing.T) {
 }
 
 func TestConfigAddProviderRequirements(t *testing.T) {
-	cfg, diags := testModuleConfigFromFile("testdata/valid-files/providers-explicit-implied.tf")
+	cfg, diags := testModuleConfigFromFile(t.Context(), "testdata/valid-files/providers-explicit-implied.tf")
 	assertNoDiagnostics(t, diags)
 
 	reqs := getproviders.Requirements{
@@ -688,7 +722,7 @@ Use the providers argument within the module block to configure providers for al
 }
 
 func TestConfigImportProviderClashesWithResources(t *testing.T) {
-	cfg, diags := testModuleConfigFromFile("testdata/invalid-import-files/import-and-resource-clash.tf")
+	cfg, diags := testModuleConfigFromFile(t.Context(), "testdata/invalid-import-files/import-and-resource-clash.tf")
 	assertNoDiagnostics(t, diags)
 	qualifs := new(getproviders.ProvidersQualification)
 
@@ -699,7 +733,7 @@ func TestConfigImportProviderClashesWithResources(t *testing.T) {
 }
 
 func TestConfigImportProviderWithNoResourceProvider(t *testing.T) {
-	cfg, diags := testModuleConfigFromFile("testdata/invalid-import-files/import-and-no-resource.tf")
+	cfg, diags := testModuleConfigFromFile(t.Context(), "testdata/invalid-import-files/import-and-no-resource.tf")
 	assertNoDiagnostics(t, diags)
 
 	qualifs := new(getproviders.ProvidersQualification)
@@ -957,4 +991,85 @@ func TestTransformForTest(t *testing.T) {
 
 		})
 	}
+}
+
+// This test is checking that by giving the outermost called module, the method called is
+// returning correctly that is a remote module relatively to the root module.
+// This is because root module is calling the child module from a remote source
+// but all the other calls are done from local modules.
+// Eg: Root module is calling a module from a git repo in a particular directory,
+// but that module is calling other modules from the same repo by referencing those
+// with a relative path.
+func TestIsCallFromRemote(t *testing.T) {
+	childName := "call-to-child"
+	gchildName := "call-to-gchild"
+	ggchildName := "call-to-ggchild"
+	gggchildName := "call-to-gggchild"
+	parseModuleSource := func(t *testing.T, source string) addrs.ModuleSource {
+		s, err := addrs.ParseModuleSource(source)
+		if err != nil {
+			t.Fatalf("failed to parse module source %q: %s", source, err)
+		}
+		return s
+	}
+	tests := map[string]struct {
+		childModulePath string
+		expectedRes     bool
+	}{
+		"from git repo": {
+			childModulePath: "git::https://github.com/user/repo//child",
+			expectedRes:     true,
+		},
+		"from registry": {
+			childModulePath: "registry.example.com/foo/bar/baz",
+			expectedRes:     true,
+		},
+		"from local": {
+			childModulePath: "../mod",
+			expectedRes:     false,
+		},
+	}
+	for ttn, tt := range tests {
+		t.Run(ttn, func(t *testing.T) {
+			root := &Config{
+				Module: &Module{
+					ModuleCalls: map[string]*ModuleCall{
+						childName: {SourceAddr: parseModuleSource(t, tt.childModulePath)},
+					},
+				},
+			}
+			child := &Config{
+				Parent: root,
+				Path:   []string{childName},
+				Module: &Module{
+					ModuleCalls: map[string]*ModuleCall{
+						gchildName: {SourceAddr: parseModuleSource(t, "../gchild-module")},
+					},
+				},
+			}
+			gchild := &Config{
+				Parent: child,
+				Path:   []string{gchildName},
+				Module: &Module{
+					ModuleCalls: map[string]*ModuleCall{
+						ggchildName: {SourceAddr: parseModuleSource(t, "../ggchild-module")},
+					},
+				},
+			}
+			ggchild := &Config{
+				Parent: gchild,
+				Path:   []string{ggchildName},
+				Module: &Module{
+					ModuleCalls: map[string]*ModuleCall{
+						gggchildName: {SourceAddr: parseModuleSource(t, "../gggchild-module")},
+					},
+				},
+			}
+
+			if want, got := tt.expectedRes, ggchild.IsModuleCallFromRemoteModule(ggchildName); want != got {
+				t.Fatalf("expected IsModuleCallFromRemoteModule to return %t but got %t", want, got)
+			}
+		})
+	}
+
 }

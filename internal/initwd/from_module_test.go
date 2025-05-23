@@ -15,6 +15,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	version "github.com/hashicorp/go-version"
+
 	"github.com/opentofu/opentofu/internal/configs"
 	"github.com/opentofu/opentofu/internal/configs/configload"
 	"github.com/opentofu/opentofu/internal/copy"
@@ -43,7 +44,7 @@ func TestDirFromModule_registry(t *testing.T) {
 
 	hooks := &testInstallHooks{}
 
-	reg := registry.NewClient(nil, nil)
+	reg := registry.NewClient(t.Context(), nil, nil)
 	loader := configload.NewLoaderForTests(t)
 	diags := DirFromModule(context.Background(), loader, dir, modsDir, "hashicorp/module-installer-acctest/aws//examples/main", reg, nil, hooks)
 	assertNoDiagnostics(t, diags)
@@ -109,7 +110,7 @@ func TestDirFromModule_registry(t *testing.T) {
 
 	// Make sure the configuration is loadable now.
 	// (This ensures that correct information is recorded in the manifest.)
-	config, loadDiags := loader.LoadConfig(".", configs.RootModuleCallForTesting())
+	config, loadDiags := loader.LoadConfig(t.Context(), ".", configs.RootModuleCallForTesting())
 	if assertNoDiagnostics(t, tfdiags.Diagnostics{}.Append(loadDiags)) {
 		return
 	}
@@ -172,7 +173,7 @@ func TestDirFromModule_submodules(t *testing.T) {
 		// treating an absolute filesystem path as if it were a "remote"
 		// source address, and so we need a real package fetcher but the
 		// way we use it here does not cause it to make network requests.
-		getmodules.NewPackageFetcher(nil),
+		getmodules.NewPackageFetcher(t.Context(), nil),
 		hooks,
 	)
 	assertNoDiagnostics(t, diags)
@@ -202,7 +203,7 @@ func TestDirFromModule_submodules(t *testing.T) {
 
 	// Make sure the configuration is loadable now.
 	// (This ensures that correct information is recorded in the manifest.)
-	config, loadDiags := loader.LoadConfig(".", configs.RootModuleCallForTesting())
+	config, loadDiags := loader.LoadConfig(t.Context(), ".", configs.RootModuleCallForTesting())
 	if assertNoDiagnostics(t, tfdiags.Diagnostics{}.Append(loadDiags)) {
 		return
 	}
@@ -256,7 +257,7 @@ func TestDirFromModule_submodulesWithProvider(t *testing.T) {
 		// treating an absolute filesystem path as if it were a "remote"
 		// source address, and so we need a real package fetcher but the
 		// way we use it here does not cause it to make network requests.
-		getmodules.NewPackageFetcher(nil),
+		getmodules.NewPackageFetcher(t.Context(), nil),
 		hooks,
 	)
 
@@ -324,7 +325,7 @@ func TestDirFromModule_rel_submodules(t *testing.T) {
 		// treating an absolute filesystem path as if it were a "remote"
 		// source address, and so we need a real package fetcher but the
 		// way we use it here does not cause it to make network requests.
-		getmodules.NewPackageFetcher(nil),
+		getmodules.NewPackageFetcher(t.Context(), nil),
 		hooks,
 	)
 	assertNoDiagnostics(t, diags)
@@ -354,7 +355,7 @@ func TestDirFromModule_rel_submodules(t *testing.T) {
 
 	// Make sure the configuration is loadable now.
 	// (This ensures that correct information is recorded in the manifest.)
-	config, loadDiags := loader.LoadConfig(".", configs.RootModuleCallForTesting())
+	config, loadDiags := loader.LoadConfig(t.Context(), ".", configs.RootModuleCallForTesting())
 	if assertNoDiagnostics(t, tfdiags.Diagnostics{}.Append(loadDiags)) {
 		return
 	}

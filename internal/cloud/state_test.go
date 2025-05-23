@@ -13,13 +13,14 @@ import (
 	"time"
 
 	tfe "github.com/hashicorp/go-tfe"
+	"github.com/zclconf/go-cty/cty"
+
 	"github.com/opentofu/opentofu/internal/addrs"
 	"github.com/opentofu/opentofu/internal/backend/local"
 	"github.com/opentofu/opentofu/internal/encryption"
 	"github.com/opentofu/opentofu/internal/states"
 	"github.com/opentofu/opentofu/internal/states/statefile"
 	"github.com/opentofu/opentofu/internal/states/statemgr"
-	"github.com/zclconf/go-cty/cty"
 )
 
 func TestState_impl(t *testing.T) {
@@ -147,11 +148,11 @@ func TestCloudLocks(t *testing.T) {
 	back, bCleanup := testBackendWithName(t)
 	defer bCleanup()
 
-	a, err := back.StateMgr(testBackendSingleWorkspaceName)
+	a, err := back.StateMgr(t.Context(), testBackendSingleWorkspaceName)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	b, err := back.StateMgr(testBackendSingleWorkspaceName)
+	b, err := back.StateMgr(t.Context(), testBackendSingleWorkspaceName)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

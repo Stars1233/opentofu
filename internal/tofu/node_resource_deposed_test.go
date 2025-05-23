@@ -6,6 +6,7 @@
 package tofu
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -195,7 +196,7 @@ func TestNodePlanDeposedResourceInstanceObject_Execute(t *testing.T) {
 			deposedKey := states.NewDeposedKey()
 			absResource := mustResourceInstanceAddr(test.nodeAddress)
 
-			ctx, p := initMockEvalContext(test.nodeAddress, deposedKey)
+			evalCtx, p := initMockEvalContext(test.nodeAddress, deposedKey)
 
 			node := NodePlanDeposedResourceInstanceObject{
 				NodeAbstractResourceInstance: &NodeAbstractResourceInstance{
@@ -208,7 +209,7 @@ func TestNodePlanDeposedResourceInstanceObject_Execute(t *testing.T) {
 				RemoveStatements: test.nodeEndpointsToRemove,
 			}
 
-			gotDiags := node.Execute(ctx, walkPlan)
+			gotDiags := node.Execute(t.Context(), evalCtx, walkPlan)
 			assertDiags(t, gotDiags, test.wantDiags)
 
 			if !p.UpgradeResourceStateCalled {
@@ -218,7 +219,7 @@ func TestNodePlanDeposedResourceInstanceObject_Execute(t *testing.T) {
 				t.Errorf("ReadResource wasn't called; should've been called to refresh the deposed object")
 			}
 
-			change := ctx.Changes().GetResourceInstanceChange(absResource, deposedKey)
+			change := evalCtx.Changes().GetResourceInstanceChange(absResource, deposedKey)
 			if got, want := change.ChangeSrc.Action, test.wantAction; got != want {
 				t.Fatalf("wrong planned action\ngot:  %s\nwant: %s", got, want)
 			}
@@ -230,7 +231,7 @@ func TestNodeDestroyDeposedResourceInstanceObject_Execute(t *testing.T) {
 	deposedKey := states.NewDeposedKey()
 	state := states.NewState()
 	absResourceAddr := "test_instance.foo"
-	ctx, _ := initMockEvalContext(absResourceAddr, deposedKey)
+	evalCtx, _ := initMockEvalContext(absResourceAddr, deposedKey)
 
 	absResource := mustResourceInstanceAddr(absResourceAddr)
 	node := NodeDestroyDeposedResourceInstanceObject{
@@ -242,7 +243,7 @@ func TestNodeDestroyDeposedResourceInstanceObject_Execute(t *testing.T) {
 		},
 		DeposedKey: deposedKey,
 	}
-	err := node.Execute(ctx, walkApply)
+	err := node.Execute(t.Context(), evalCtx, walkApply)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
@@ -255,9 +256,9 @@ func TestNodeDestroyDeposedResourceInstanceObject_Execute(t *testing.T) {
 
 func TestNodeDestroyDeposedResourceInstanceObject_WriteResourceInstanceState(t *testing.T) {
 	state := states.NewState()
-	ctx := new(MockEvalContext)
-	ctx.StateState = state.SyncWrapper()
-	ctx.PathPath = addrs.RootModuleInstance
+	evalCtx := new(MockEvalContext)
+	evalCtx.StateState = state.SyncWrapper()
+	evalCtx.PathPath = addrs.RootModuleInstance
 	mockProvider := mockProviderWithResourceTypeSchema("aws_instance", &configschema.Block{
 		Attributes: map[string]*configschema.Attribute{
 			"id": {
@@ -266,8 +267,8 @@ func TestNodeDestroyDeposedResourceInstanceObject_WriteResourceInstanceState(t *
 			},
 		},
 	})
-	ctx.ProviderProvider = mockProvider
-	ctx.ProviderSchemaSchema = mockProvider.GetProviderSchema()
+	evalCtx.ProviderProvider = mockProvider
+	evalCtx.ProviderSchemaSchema = mockProvider.GetProviderSchema(t.Context())
 
 	obj := &states.ResourceInstanceObject{
 		Value: cty.ObjectVal(map[string]cty.Value{
@@ -284,7 +285,7 @@ func TestNodeDestroyDeposedResourceInstanceObject_WriteResourceInstanceState(t *
 		},
 		DeposedKey: states.NewDeposedKey(),
 	}
-	err := node.writeResourceInstanceState(ctx, obj)
+	err := node.writeResourceInstanceState(t.Context(), evalCtx, obj)
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err.Error())
 	}
@@ -299,10 +300,10 @@ aws_instance.foo: (1 deposed)
 
 func TestNodeDestroyDeposedResourceInstanceObject_ExecuteMissingState(t *testing.T) {
 	p := simpleMockProvider()
-	ctx := &MockEvalContext{
+	evalCtx := &MockEvalContext{
 		StateState:           states.NewState().SyncWrapper(),
 		ProviderProvider:     simpleMockProvider(),
-		ProviderSchemaSchema: p.GetProviderSchema(),
+		ProviderSchemaSchema: p.GetProviderSchema(t.Context()),
 		ChangesChanges:       plans.NewChanges().SyncWrapper(),
 	}
 
@@ -315,7 +316,7 @@ func TestNodeDestroyDeposedResourceInstanceObject_ExecuteMissingState(t *testing
 		},
 		DeposedKey: states.NewDeposedKey(),
 	}
-	err := node.Execute(ctx, walkApply)
+	err := node.Execute(t.Context(), evalCtx, walkApply)
 
 	if err == nil {
 		t.Fatal("expected error")
@@ -326,7 +327,7 @@ func TestNodeForgetDeposedResourceInstanceObject_Execute(t *testing.T) {
 	deposedKey := states.NewDeposedKey()
 	state := states.NewState()
 	absResourceAddr := "test_instance.foo"
-	ctx, _ := initMockEvalContext(absResourceAddr, deposedKey)
+	evalCtx, _ := initMockEvalContext(absResourceAddr, deposedKey)
 
 	absResource := mustResourceInstanceAddr(absResourceAddr)
 	node := NodeForgetDeposedResourceInstanceObject{
@@ -338,7 +339,7 @@ func TestNodeForgetDeposedResourceInstanceObject_Execute(t *testing.T) {
 		},
 		DeposedKey: deposedKey,
 	}
-	err := node.Execute(ctx, walkApply)
+	err := node.Execute(t.Context(), evalCtx, walkApply)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
@@ -384,7 +385,7 @@ func initMockEvalContext(resourceAddrs string, deposedKey states.DeposedKey) (*M
 	}
 
 	p := testProvider("test")
-	p.ConfigureProvider(providers.ConfigureProviderRequest{})
+	p.ConfigureProvider(context.TODO(), providers.ConfigureProviderRequest{})
 	p.GetProviderSchemaResponse = &schema
 
 	p.UpgradeResourceStateResponse = &providers.UpgradeResourceStateResponse{

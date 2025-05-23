@@ -138,7 +138,7 @@ func TestLocalRun_stalePlan(t *testing.T) {
 	}
 
 	// Refresh the state
-	sm, err := b.StateMgr("")
+	sm, err := b.StateMgr(t.Context(), "")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -212,7 +212,7 @@ type backendWithStateStorageThatFailsRefresh struct {
 
 var _ backend.Backend = backendWithStateStorageThatFailsRefresh{}
 
-func (b backendWithStateStorageThatFailsRefresh) StateMgr(workspace string) (statemgr.Full, error) {
+func (b backendWithStateStorageThatFailsRefresh) StateMgr(_ context.Context, workspace string) (statemgr.Full, error) {
 	return &stateStorageThatFailsRefresh{}, nil
 }
 
@@ -224,15 +224,15 @@ func (b backendWithStateStorageThatFailsRefresh) PrepareConfig(in cty.Value) (ct
 	return in, nil
 }
 
-func (b backendWithStateStorageThatFailsRefresh) Configure(cty.Value) tfdiags.Diagnostics {
+func (b backendWithStateStorageThatFailsRefresh) Configure(context.Context, cty.Value) tfdiags.Diagnostics {
 	return nil
 }
 
-func (b backendWithStateStorageThatFailsRefresh) DeleteWorkspace(name string, force bool) error {
+func (b backendWithStateStorageThatFailsRefresh) DeleteWorkspace(_ context.Context, name string, force bool) error {
 	return fmt.Errorf("unimplemented")
 }
 
-func (b backendWithStateStorageThatFailsRefresh) Workspaces() ([]string, error) {
+func (b backendWithStateStorageThatFailsRefresh) Workspaces(context.Context) ([]string, error) {
 	return []string{"default"}, nil
 }
 

@@ -896,7 +896,7 @@ func TestPrepareFinalInputVariableValue(t *testing.T) {
 			{
 				ValueFromUnknown,
 				tfdiags.SourceRange{},
-				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set from outside of the configuration: string required.`,
+				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set from outside of the configuration: string required, but have object.`,
 				`Required variable not set: Unsuitable value for var.constrained_string_required set from outside of the configuration: required variable may not be set to null.`,
 			},
 			{
@@ -906,7 +906,7 @@ func TestPrepareFinalInputVariableValue(t *testing.T) {
 					Start:    tfdiags.SourcePos(hcl.InitialPos),
 					End:      tfdiags.SourcePos(hcl.InitialPos),
 				},
-				`Invalid value for input variable: The given value is not suitable for var.constrained_string_required declared at main.tf:32,3-41: string required.`,
+				`Invalid value for input variable: The given value is not suitable for var.constrained_string_required declared at main.tf:32,3-41: string required, but have object.`,
 				`Required variable not set: The given value is not suitable for var.constrained_string_required defined at main.tf:32,3-41: required variable may not be set to null.`,
 			},
 			{
@@ -916,7 +916,7 @@ func TestPrepareFinalInputVariableValue(t *testing.T) {
 					Start:    tfdiags.SourcePos(hcl.InitialPos),
 					End:      tfdiags.SourcePos(hcl.InitialPos),
 				},
-				`Invalid value for input variable: The given value is not suitable for var.constrained_string_required declared at main.tf:32,3-41: string required.`,
+				`Invalid value for input variable: The given value is not suitable for var.constrained_string_required declared at main.tf:32,3-41: string required, but have object.`,
 				`Required variable not set: The given value is not suitable for var.constrained_string_required defined at main.tf:32,3-41: required variable may not be set to null.`,
 			},
 			{
@@ -926,25 +926,25 @@ func TestPrepareFinalInputVariableValue(t *testing.T) {
 					Start:    tfdiags.SourcePos(hcl.InitialPos),
 					End:      tfdiags.SourcePos(hcl.InitialPos),
 				},
-				`Invalid value for input variable: The given value is not suitable for var.constrained_string_required declared at main.tf:32,3-41: string required.`,
+				`Invalid value for input variable: The given value is not suitable for var.constrained_string_required declared at main.tf:32,3-41: string required, but have object.`,
 				`Required variable not set: The given value is not suitable for var.constrained_string_required defined at main.tf:32,3-41: required variable may not be set to null.`,
 			},
 			{
 				ValueFromCLIArg,
 				tfdiags.SourceRange{},
-				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set using -var="constrained_string_required=...": string required.`,
+				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set using -var="constrained_string_required=...": string required, but have object.`,
 				`Required variable not set: Unsuitable value for var.constrained_string_required set using -var="constrained_string_required=...": required variable may not be set to null.`,
 			},
 			{
 				ValueFromEnvVar,
 				tfdiags.SourceRange{},
-				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set using the TF_VAR_constrained_string_required environment variable: string required.`,
+				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set using the TF_VAR_constrained_string_required environment variable: string required, but have object.`,
 				`Required variable not set: Unsuitable value for var.constrained_string_required set using the TF_VAR_constrained_string_required environment variable: required variable may not be set to null.`,
 			},
 			{
 				ValueFromInput,
 				tfdiags.SourceRange{},
-				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set using an interactive prompt: string required.`,
+				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set using an interactive prompt: string required, but have object.`,
 				`Required variable not set: Unsuitable value for var.constrained_string_required set using an interactive prompt: required variable may not be set to null.`,
 			},
 			{
@@ -955,13 +955,13 @@ func TestPrepareFinalInputVariableValue(t *testing.T) {
 				// and during planning we'll always have other source types.
 				ValueFromPlan,
 				tfdiags.SourceRange{},
-				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set from outside of the configuration: string required.`,
+				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set from outside of the configuration: string required, but have object.`,
 				`Required variable not set: Unsuitable value for var.constrained_string_required set from outside of the configuration: required variable may not be set to null.`,
 			},
 			{
 				ValueFromCaller,
 				tfdiags.SourceRange{},
-				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set from outside of the configuration: string required.`,
+				`Invalid value for input variable: Unsuitable value for var.constrained_string_required set from outside of the configuration: string required, but have object.`,
 				`Required variable not set: Unsuitable value for var.constrained_string_required set from outside of the configuration: required variable may not be set to null.`,
 			},
 		}
@@ -1020,7 +1020,7 @@ func TestPrepareFinalInputVariableValue(t *testing.T) {
 			{
 				ValueFromUnknown,
 				tfdiags.SourceRange{},
-				"Invalid value for input variable: Unsuitable value for var.constrained_string_sensitive_required set from outside of the configuration: string required.",
+				"Invalid value for input variable: Unsuitable value for var.constrained_string_sensitive_required set from outside of the configuration: string required, but have object.",
 				false,
 			},
 			{
@@ -1030,7 +1030,7 @@ func TestPrepareFinalInputVariableValue(t *testing.T) {
 					Start:    tfdiags.SourcePos(hcl.InitialPos),
 					End:      tfdiags.SourcePos(hcl.InitialPos),
 				},
-				`Invalid value for input variable: The given value is not suitable for var.constrained_string_sensitive_required, which is sensitive: string required. Invalid value defined at example.tfvars:1,1-1.`,
+				`Invalid value for input variable: The given value is not suitable for var.constrained_string_sensitive_required, which is sensitive: string required, but have object. Invalid value defined at example.tfvars:1,1-1.`,
 				true,
 			},
 		}
@@ -1484,9 +1484,10 @@ func TestEvalVariableValidations_deprecationDiagnostics(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		varAddr addrs.AbsInputVariableInstance
-		varCfg  *configs.Variable
-		expr    hcl.Expression
+		varAddr    addrs.AbsInputVariableInstance
+		varCfg     *configs.Variable
+		expr       hcl.Expression
+		fromRemote bool
 
 		expectedDiags tfdiags.Diagnostics
 	}{
@@ -1496,25 +1497,28 @@ func TestEvalVariableValidations_deprecationDiagnostics(t *testing.T) {
 			expr:    cfg.Module.ModuleCalls["foo-call"].Source,
 			expectedDiags: tfdiags.Diagnostics{}.Append(&hcl.Diagnostic{
 				Severity: hcl.DiagWarning,
-				Summary:  `The variable "foo" is marked as deprecated by module author`,
+				Summary:  `Variable marked as deprecated by the module author`,
 				Detail: fmt.Sprintf(
-					"This variable is marked as deprecated with the following message:\n%s",
+					"Variable \"foo\" is marked as deprecated with the following message:\n%s",
 					cfg.Children["foo-call"].Module.Variables["foo"].Deprecated,
 				),
 				Subject: cfg.Module.ModuleCalls["foo-call"].Source.Range().Ptr(),
 			}),
+			fromRemote: false,
 		},
 		"local-mod-called-from-root-with-no-var": {
 			varAddr:       addrs.InputVariable{Name: "foo"}.Absolute(addrs.RootModuleInstance.Child("foo-call-no-var", nil)),
 			varCfg:        cfg.Children["foo-call-no-var"].Module.Variables["foo"],
 			expr:          nil,
 			expectedDiags: tfdiags.Diagnostics{},
+			fromRemote:    false,
 		},
 		"local-mod-called-from-root-with-null-var": {
 			varAddr:       addrs.InputVariable{Name: "foo"}.Absolute(addrs.RootModuleInstance.Child("foo-call-null", nil)),
 			varCfg:        cfg.Children["foo-call-null"].Module.Variables["foo"],
 			expr:          nil,
 			expectedDiags: tfdiags.Diagnostics{},
+			fromRemote:    false,
 		},
 		"local-mod-called-from-direct-child": {
 			varAddr: addrs.InputVariable{Name: "bar"}.Absolute(addrs.RootModuleInstance.Child("foo-call", nil).Child("bar-call", nil)),
@@ -1522,13 +1526,14 @@ func TestEvalVariableValidations_deprecationDiagnostics(t *testing.T) {
 			expr:    cfg.Children["foo-call"].Module.ModuleCalls["bar-call"].Source,
 			expectedDiags: tfdiags.Diagnostics{}.Append(&hcl.Diagnostic{
 				Severity: hcl.DiagWarning,
-				Summary:  `The variable "bar" is marked as deprecated by module author`,
+				Summary:  `Variable marked as deprecated by the module author`,
 				Detail: fmt.Sprintf(
-					"This variable is marked as deprecated with the following message:\n%s",
+					"Variable \"bar\" is marked as deprecated with the following message:\n%s",
 					cfg.Children["foo-call"].Children["bar-call"].Module.Variables["bar"].Deprecated,
 				),
 				Subject: cfg.Children["foo-call"].Module.ModuleCalls["bar-call"].Source.Range().Ptr(),
 			}),
+			fromRemote: false,
 		},
 	}
 	for name, tt := range tests {
@@ -1544,12 +1549,7 @@ func TestEvalVariableValidations_deprecationDiagnostics(t *testing.T) {
 			}
 
 			expr := tt.expr
-			gotDiags := evalVariableDeprecation(
-				varAddr,
-				tt.varCfg,
-				expr,
-				ctx,
-			)
+			gotDiags := evalVariableDeprecation(varAddr, tt.varCfg, expr, ctx, tt.fromRemote)
 
 			if gotLen, expectedLen := len(gotDiags), len(tt.expectedDiags); gotLen != expectedLen {
 				t.Fatalf("expected %d diagnostics; got %d", expectedLen, gotLen)

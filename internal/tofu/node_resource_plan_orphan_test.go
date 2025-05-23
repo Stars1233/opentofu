@@ -215,10 +215,10 @@ func TestNodeResourcePlanOrphan_Execute(t *testing.T) {
 			}
 
 			p := simpleMockProvider()
-			p.ConfigureProvider(providers.ConfigureProviderRequest{})
+			p.ConfigureProvider(t.Context(), providers.ConfigureProviderRequest{})
 			p.GetProviderSchemaResponse = &schema
 
-			ctx := &MockEvalContext{
+			evalCtx := &MockEvalContext{
 				StateState:               state.SyncWrapper(),
 				RefreshStateState:        state.DeepCopy().SyncWrapper(),
 				PrevRunStateState:        state.DeepCopy().SyncWrapper(),
@@ -241,10 +241,10 @@ func TestNodeResourcePlanOrphan_Execute(t *testing.T) {
 				RemoveStatements: test.nodeEndpointsToRemove,
 			}
 
-			gotDiags := node.Execute(ctx, walkPlan)
+			gotDiags := node.Execute(t.Context(), evalCtx, walkPlan)
 			assertDiags(t, gotDiags, test.wantDiags)
 
-			change := ctx.Changes().GetResourceInstanceChange(absResource, states.NotDeposed)
+			change := evalCtx.Changes().GetResourceInstanceChange(absResource, states.NotDeposed)
 			if got, want := change.ChangeSrc.Action, test.wantAction; got != want {
 				t.Fatalf("wrong planned action\ngot:  %s\nwant: %s", got, want)
 			}
@@ -283,11 +283,11 @@ func TestNodeResourcePlanOrphanExecute_alreadyDeleted(t *testing.T) {
 	changes := plans.NewChanges()
 
 	p := simpleMockProvider()
-	p.ConfigureProvider(providers.ConfigureProviderRequest{})
+	p.ConfigureProvider(t.Context(), providers.ConfigureProviderRequest{})
 	p.ReadResourceResponse = &providers.ReadResourceResponse{
 		NewState: cty.NullVal(p.GetProviderSchemaResponse.ResourceTypes["test_string"].Block.ImpliedType()),
 	}
-	ctx := &MockEvalContext{
+	evalCtx := &MockEvalContext{
 		StateState:               state.SyncWrapper(),
 		RefreshStateState:        refreshState.SyncWrapper(),
 		PrevRunStateState:        prevRunState.SyncWrapper(),
@@ -314,7 +314,7 @@ func TestNodeResourcePlanOrphanExecute_alreadyDeleted(t *testing.T) {
 			Addr: mustResourceInstanceAddr("test_object.foo"),
 		},
 	}
-	diags := node.Execute(ctx, walkPlan)
+	diags := node.Execute(t.Context(), evalCtx, walkPlan)
 	if diags.HasErrors() {
 		t.Fatalf("unexpected error: %s", diags.Err())
 	}
@@ -366,11 +366,11 @@ func TestNodeResourcePlanOrphanExecute_deposed(t *testing.T) {
 	changes := plans.NewChanges()
 
 	p := simpleMockProvider()
-	p.ConfigureProvider(providers.ConfigureProviderRequest{})
+	p.ConfigureProvider(t.Context(), providers.ConfigureProviderRequest{})
 	p.ReadResourceResponse = &providers.ReadResourceResponse{
 		NewState: cty.NullVal(p.GetProviderSchemaResponse.ResourceTypes["test_string"].Block.ImpliedType()),
 	}
-	ctx := &MockEvalContext{
+	evalCtx := &MockEvalContext{
 		StateState:               state.SyncWrapper(),
 		RefreshStateState:        refreshState.SyncWrapper(),
 		PrevRunStateState:        prevRunState.SyncWrapper(),
@@ -397,7 +397,7 @@ func TestNodeResourcePlanOrphanExecute_deposed(t *testing.T) {
 			Addr: mustResourceInstanceAddr("test_object.foo"),
 		},
 	}
-	diags := node.Execute(ctx, walkPlan)
+	diags := node.Execute(t.Context(), evalCtx, walkPlan)
 	if diags.HasErrors() {
 		t.Fatalf("unexpected error: %s", diags.Err())
 	}
